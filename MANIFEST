@@ -1,0 +1,7 @@
+Changes
+Makefile.PL
+MANIFEST
+README
+t/Math-Assistant.t
+lib/Math/Assistant.pm
+META.yml                                 Module meta-data (added by MakeMaker)

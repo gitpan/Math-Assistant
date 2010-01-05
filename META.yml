@@ -1,0 +1,25 @@
+--- #YAML:1.0
+name:               Math-Assistant
+version:            0.02
+abstract:           functions for various exact algebraic calculations
+author:
+    - Alessandro Gorohovski <angel@feht.dgtu.donetsk.ua>
+license:            unknown
+distribution_type:  module
+configure_requires:
+    ExtUtils::MakeMaker:  0
+build_requires:
+    ExtUtils::MakeMaker:  0
+requires:
+    Algorithm::Combinatorics:  0.25
+    Math::BigFloat:       1.60
+    Math::BigInt:         1.89
+    Test::More:           0
+no_index:
+    directory:
+        - t
+        - inc
+generated_by:       ExtUtils::MakeMaker version 6.54
+meta-spec:
+    url:      http://module-build.sourceforge.net/META-spec-v1.4.html
+    version:  1.4
