@@ -4,10 +4,12 @@ use 5.008008;
 use strict;
 use warnings;
 
-require Exporter;
-require Algorithm::Combinatorics; # qw( permutations )
-require Math::BigInt; # qw( bgcd )
+use Carp;
+use Algorithm::Combinatorics qw( permutations );
+use Math::BigInt qw( bgcd );
+
 require Math::BigFloat;
+require Exporter;
 
 our @ISA = qw(Exporter);
 
@@ -21,7 +23,7 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 our @EXPORT = qw( );
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 use base qw(Exporter);
 
@@ -32,6 +34,8 @@ use base qw(Exporter);
 # return:
 #	$rank (order)
 sub Rank{
+    croak("Bad matrix") if &_test_matrix($_[0]) > 1;
+
     my $M = &Gaussian_elimination; # triangular matrix
     my $rank = 0;
 
@@ -51,6 +55,7 @@ sub Rank{
 #	$elimination_Dimention
 sub Gaussian_elimination{
     my $M_ini = shift;
+    croak("Bad matrix") if &_test_matrix($M_ini) > 1;
 
     my $rows = $#{$M_ini}; # number of rows
     my $cols = $#{$M_ini->[0]}; # number of columns
@@ -116,9 +121,11 @@ sub Gaussian_elimination{
     undef %zc;
 
     for(my $n = 0; $n < $rows; $n++){
+	last if $n > $cols; # other zero rows
 
 	# Replacement of zero diagonal element
         my $s = 0;
+M_Gauss1:
 	while($M->[$n][$n] == 0 && $s < $rows-$n){
 	    $s++;
 	    for( my $j = $n+1; $j <= $cols; $j++ ){
@@ -128,7 +135,7 @@ sub Gaussian_elimination{
 		    for( my $i = 0; $i <= $rows; $i++ ){
 			($M->[$i][$j], $M->[$i][$n]) = ($M->[$i][$n], $M->[$i][$j]);
 		    }
-		    last;
+		    last M_Gauss1;
 		}
 	    }
 
@@ -138,6 +145,7 @@ sub Gaussian_elimination{
 		($M->[$n][$j], $M->[$n+$s][$j]) = ($M->[$n+$s][$j], $M->[$n][$j]);
 	    }
 	}
+
 
 	last unless $M->[$n][$n]; # zero elements of rows
 
@@ -160,7 +168,7 @@ sub Gaussian_elimination{
 	    }
 	}
 
-	my $gcd = Math::BigInt::bgcd(@{$M->[$n]}[$n..$cols]);
+	my $gcd = bgcd(@{$M->[$n]}[$n..$cols]);
 	if($gcd > 1){
 	    $_ /= $gcd for @{$M->[$n]}[$n..$cols];
 	}
@@ -176,14 +184,13 @@ sub Gaussian_elimination{
 #	determinant
 #	undef
 sub Det{
-
     my $M_ini = shift;
+    croak("Matrix is not quadratic") if &_test_matrix($M_ini);
+
     my $det = 0;
 
     my $rows = $#{$M_ini}; # number of rows
     my $cols = $#{$M_ini->[0]}; # number of columns
-
-    return undef if $rows != $cols;
 
     return $M_ini->[0][0] if $#{$M_ini} < 1; # dim matrix = 1
 
@@ -207,8 +214,7 @@ sub Det{
 	$M = $M_ini;
     }
 
-
-    my $iter = Algorithm::Combinatorics::permutations([(0..$#{$M})]);
+    my $iter = permutations([(0..$#{$M})]);
     while(my $prm = $iter->next){
 	my $sign = 1; # +/-
 	my $p = 1;
@@ -235,14 +241,31 @@ sub Det{
 
 
 sub Solve_Det{
-    my($M, $B) = @_;
+    my($M, $B, $opts) = @_;
 
-    my $solve;
+    croak("Missing matrix") if not defined $M;
+    croak("Missing vector") if not defined $B;
 
     my $rows = $#{$M}; # number of rows
     my $cols = $#{$M->[0]}; # number of columns
 
-    return undef if $rows != $cols || $rows != $#{$B};  # no quadratic
+    croak("Matrix is not quadratic") if &_test_matrix($M);
+
+    croak("Vector doesn't correspond to a matrix") if $rows != $#{$B};
+
+    if(defined $opts){
+	if(exists $opts->{'eqs'}){
+	    die "Unknown parameter \'$opts->{'eqs'}\'!\n"
+		unless $opts->{'eqs'}=~/^(?:row|column)/i;
+
+	}else{
+	    $opts->{'eqs'} = 'row';
+	}
+    }else{
+	$opts->{'eqs'} = 'row';
+    }
+
+    my $solve;
 
     # main determinant
     my $det_main = Det($M);
@@ -250,12 +273,19 @@ sub Solve_Det{
     return undef unless $det_main; # no one solution
 
     for( my $v = 0; $v <= $cols; $v++ ){
-	my $R; # copy of matrix M
 
+	my $R; # copy of matrix M
 	for( my $i = 0; $i <= $rows; $i++ ){
-	    for( my $j = 0; $j <= $cols; $j++ ){
-		$R->[$i][$j] = $v == $j ? $B->[$i] : $M->[$i][$j];
+
+	    if($opts->{'eqs'}=~/^col/i){
+		$R->[$i] = $v == $i ? $B : $M->[$i];
+
+	    }else{
+		for( my $j = 0; $j <= $cols; $j++ ){
+		    $R->[$i][$j] = $v == $j ? $B->[$i] : $M->[$i][$j];
+		}
 	    }
+
 	}
 
 	my $det = Det($R);
@@ -274,7 +304,7 @@ sub Solve_Det{
 		$_ *= 10**$max_frac for($dm, $det);
 	    }
 
-	    my $gcd = Math::BigInt::bgcd(abs($det), abs($dm));
+	    my $gcd = bgcd(abs($det), abs($dm));
 	    if($gcd > 1){
 		$det /= $gcd;
 		$dm /= $gcd;
@@ -302,6 +332,25 @@ sub _max_len_frac{
     $max_frac;
 }
 
+
+sub _test_matrix{
+    my $M = shift;
+
+    my $rows = $#{$M}; # number of rows
+    my $cols = $#{$M->[0]}; # number of columns
+
+    my $quadra = 0;
+    $quadra = scalar( grep $#{$_} != $rows, @{$M} );
+    my $reqtan = 0;
+    $reqtan = scalar( grep $#{$_} != $cols, @{$M} );
+
+    my $res = 0;
+    $res++ if $quadra;
+    $res += 2 if $reqtan;
+
+    $res;
+}
+
 1;
 __END__
 
@@ -327,25 +376,37 @@ Math::Assistant - functions for various exact algebraic calculations
 
   # Solve an equation system
   my $B = [ 1,2,3,4 ];
-  my $solve = Solve_Det($M, $B);
+  my $solve = Solve_Det($M, $B); # eqs => 'row' (default)
+  print "Equations is rows of matrix:\n";
   print "$_\n" for @{$solve};
 
   use Math::BigRat;
   print(Math::BigRat->new("$_")->numify(),"\n") for @{$solve};
 
+  print "Equations is columns of matrix:\n";
+  print "$_\n" for @{ Solve_Det( $M, $B, {'eqs' => 'column' } ) ;
+
+
 will print
 
     Rank = 4
     Determinant = -558
-    433/279
-    -32/279
-    -314/279
-    70/93
+    Equations is rows of matrix:
+	433/279
+	-32/279
+	-314/279
+	70/93
 
     1.55197132616487
     -0.114695340501792
     -1.12544802867384
     0.752688172043011
+
+    Equations is columns of matrix:
+	283/186
+	-77/93
+	11/62
+	13/93
 
 
 =head1 DESCRIPTION
@@ -361,7 +422,7 @@ Math::Assistant provides these subroutines:
 
     Rank(\@matrix)
     Det(\@matrix)
-    Solve_Det(\@A_matrix, \@b_vector)
+    Solve_Det(\@A_matrix, \@b_vector, {eqs => 'row|column' } )
     Gaussian_elimination(\@matrix)
 
 All of them are context-sensitive.
@@ -381,47 +442,62 @@ This subroutine returns the determinant of the C<@matrix>.
 Only quadratic matrices have determinant. For non-quadratic matrix returns C<undef>.
 
 
-=head2 Solve_Det(\@A_matrix, \@b_vector)
+=head2 Solve_Det(\@A_matrix, \@b_vector, {eqs => 'row|column' } )
 
 Use this subroutine to actually solve an equation system.
 
 Matrix "C<@A_matrix>" must be quadratic matrix of your equation system
-C<A * x = b>.
+C<A * x = b>. By default the equations are in rows.
 
 The input vector "C<@b_vector>" is the vector "b" in your equation system
 C<A * x = b>, which must be a row vector and have the same number of
-elements as the input matrix "C<@A_matrix>" have rows.
+elements as the input matrix "C<@A_matrix>" have rows (columns).
 
 The subroutine returns the solution vector "C<$x>"
 (which is the vector "x" of your equation system C<A * x = b>) or C<undef>
 is no solution.
 
+    # Equation system:
+    # x1 + x2 + x3 + x4 + x5 + x6 + x7 = 4
+    # 64*x1 + 32*x2 + 16*x3 + 8*x4 + 4*x5 + 2*x6 + x7 = 85
+    # ...................................
+    # 7**6*x1 + 7**5*x2 + 7**4*x3 + 7**3*x4 + 7**2*x5 + 7*x6 + x7 = 120100
+
     my $M = [
 	[1,1,1,1,1,1,1],
 	[64,32,16,8,4,2,1],
 	[729,243,81,27,9,3,1],
-	[4096,1024,256,64,16,4,1],
+	[4**6, 4**5, 256,64,16,4,1],
 	[5**6, 5**5, 5**4, 5**3, 5**2, 5, 1],
 	[6**6, 6**5, 6**4, 6**3, 6**2, 6, 1],
 	[7**6, 7**5, 7**4, 7**3, 7**2, 7, 1],
 	 ];
 
-    my $B = [ 4,85,820,4369,16276,47989,120100 ];
+    my $B = [ 4, 85, 820, 4369, 16276, 47989, 120100 ];
 
-    my $solve = Solve_Det($M, $B);
-    print "$_\t" for @{$solve};
+    print "$_\t" for @{ Solve_Det($M, $B) };
 
 will print:
+
     1 0 1 0 1 0 1
 
-    # other example
-    $M = [ [1.3, 2.5, 3.1, 4.2], [2.1, 4.7, 6.2, 8.7],
-	    [34, 8.2, 12, 16], [78,16,24,33] ];
-    Solve_Det($M, [ 1.1, 2.2, 3.3, 4.4 ] );
+Other example:
+
+    # Equation system:
+    # 1.3*x1 + 2.1*x2 + 34*x3 + 78*x4 = 1.1
+    # 2.5*x1 + 4.7*x2 + 8.2*x3 + 16*x4 = 2.2
+    # 3.1*x1 + 6.2*x2 + 12*x3 + 24*x4 = 3.3
+    # 4.2*x1 + 8.7*x2 + 16*x3 + 33*x4 = 4.4
+
+    $M = [  [1.3, 2.5, 3.1, 4.2],
+	    [2.1, 4.7, 6.2, 8.7],
+	    [34,  8.2, 12,  16],
+	    [78,  16,  24,  33] ];
+    print "$_\t" for @{ Solve_Det($M, [ 1.1, 2.2, 3.3, 4.4 ], {eqs => 'column'} ) };
 
 will print:
 
- -20427/173770 -47993/34754 317493/86885 -27401/17377
+    -38049/17377  22902/17377  35101/34754  -36938/86885
 
 
 =head2 Gaussian_elimination(\@matrix)
@@ -450,7 +526,7 @@ and the tag C<all> exports them all:
 
 Math::Assistant is known to run under perl 5.8.8 on Linux.
 The distribution uses L<Algorithm::Combinatorics> for the subroutine C<Det()>,
-L<Math::BigInt> and L<Math::BigFloat>.
+L<Math::BigInt>, L<Math::BigFloat> and L<Carp>.
 
 
 =head1 SEE ALSO

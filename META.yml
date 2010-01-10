@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Math-Assistant
-version:            0.02
+version:            0.03
 abstract:           functions for various exact algebraic calculations
 author:
     - Alessandro Gorohovski <angel@feht.dgtu.donetsk.ua>
@@ -12,6 +12,7 @@ build_requires:
     ExtUtils::MakeMaker:  0
 requires:
     Algorithm::Combinatorics:  0.25
+    Carp:                 0
     Math::BigFloat:       1.60
     Math::BigInt:         1.89
     Test::More:           0

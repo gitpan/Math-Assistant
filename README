@@ -28,6 +28,7 @@ Algorithm::Combinatorics
 Math::BigInt
 Math::BigFloat
 Test::More
+Carp
 
 
 COPYRIGHT AND LICENCE

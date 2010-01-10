@@ -8,6 +8,7 @@ WriteMakefile(
             'Algorithm::Combinatorics'   => '0.25',
             'Math::BigInt'	=> '1.89',
             'Math::BigFloat'	=> '1.60',
+            'Carp'		=> '0',
             'Test::More'	=> '0',
     },
     dist => {
