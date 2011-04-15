@@ -5,9 +5,9 @@ WriteMakefile(
     NAME              => 'Math::Assistant',
     VERSION_FROM      => 'lib/Math/Assistant.pm',
     PREREQ_PM         => {
-            'Algorithm::Combinatorics'   => '0.25',
-            'Math::BigInt'	=> '1.89',
-            'Math::BigFloat'	=> '1.60',
+            'Algorithm::Combinatorics'   => '0.26',
+            'Math::BigInt'	=> '1.993',
+            'Math::BigFloat'	=> '1.993',
             'Carp'		=> '0',
             'Test::More'	=> '0',
     },

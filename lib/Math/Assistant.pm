@@ -23,7 +23,7 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 our @EXPORT = qw( );
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 use base qw(Exporter);
 
@@ -34,14 +34,21 @@ use base qw(Exporter);
 # return:
 #	$rank (order)
 sub Rank{
-    croak("Bad matrix") if &_test_matrix($_[0]) > 1;
+
+    my $t = &_test_matrix($_[0]);
+    if( $t > 3 ){
+	croak("Use of uninitialized value in matrix");
+
+    }elsif( $t > 1 ){
+	croak("Bad matrix");
+    }
 
     my $M = &Gaussian_elimination; # triangular matrix
     my $rank = 0;
 
-    for my $i (@{$M}){ # rows
-	for(@{$i}){ # element in row
-	    $rank++, last if $_;
+    for( @{ $M } ){ # rows
+	for( @{$_} ){ # element in row
+	    $rank++, last if $_
 	}
     }
     $rank;
@@ -55,7 +62,14 @@ sub Rank{
 #	$elimination_Dimention
 sub Gaussian_elimination{
     my $M_ini = shift;
-    croak("Bad matrix") if &_test_matrix($M_ini) > 1;
+
+    my $t = &_test_matrix( $M_ini );
+    if( $t > 3 ){
+	croak("Use of uninitialized value in matrix");
+
+    }elsif( $t > 1 ){
+	croak("Bad matrix");
+    }
 
     my $rows = $#{$M_ini}; # number of rows
     my $cols = $#{$M_ini->[0]}; # number of columns
@@ -83,7 +97,6 @@ sub Gaussian_elimination{
 	    $_ *= 10**$max_frac for @{$i};
 	}
     }
-
 
     if(keys %zr){ # yes, zero rows (columns)
 
@@ -168,7 +181,7 @@ M_Gauss1:
 	    }
 	}
 
-	my $gcd = bgcd(@{$M->[$n]}[$n..$cols]);
+	my $gcd = bgcd( @{$M->[$n]}[$n..$cols] );
 	if($gcd > 1){
 	    $_ /= $gcd for @{$M->[$n]}[$n..$cols];
 	}
@@ -185,7 +198,14 @@ M_Gauss1:
 #	undef
 sub Det{
     my $M_ini = shift;
-    croak("Matrix is not quadratic") if &_test_matrix($M_ini);
+
+    my $t = &_test_matrix($M_ini);
+    if( $t > 3 ){
+	croak("Use of uninitialized value in matrix");
+
+    }elsif( $t ){
+	croak("Matrix is not quadratic");
+    }
 
     my $det = 0;
 
@@ -201,7 +221,7 @@ sub Det{
     }
 
     my $M;
-    if($max_frac){
+    if( $max_frac ){
 	for( my $i = 0; $i <= $rows; $i++ ){
 	    for( my $j = 0; $j <= $cols; $j++ ){
 		$M->[$i][$j] = $M_ini->[$i][$j];
@@ -241,17 +261,23 @@ sub Det{
 
 
 sub Solve_Det{
-    my($M, $B, $opts) = @_;
-
-    croak("Missing matrix") if not defined $M;
-    croak("Missing vector") if not defined $B;
+    my $M = shift || croak("Missing matrix");
+    my $B = shift || croak("Missing vector");
+    my $opts = shift;
 
     my $rows = $#{$M}; # number of rows
     my $cols = $#{$M->[0]}; # number of columns
 
-    croak("Matrix is not quadratic") if &_test_matrix($M);
+    my $t = &_test_matrix($M);
+    if( $t > 3 ){
+	croak("Use of uninitialized value in matrix");
+
+    }elsif( $t ){
+	croak("Matrix is not quadratic");
+    }
 
     croak("Vector doesn't correspond to a matrix") if $rows != $#{$B};
+    croak("Use of uninitialized value in vector") if scalar( grep !defined $_, @{$B} );
 
     if(defined $opts){
 	if(exists $opts->{'eqs'}){
@@ -268,9 +294,7 @@ sub Solve_Det{
     my $solve;
 
     # main determinant
-    my $det_main = Det($M);
-    return undef unless defined $det_main;
-    return undef unless $det_main; # no one solution
+    my $det_main = Det($M) || return undef; # no one solution
 
     for( my $v = 0; $v <= $cols; $v++ ){
 
@@ -291,8 +315,8 @@ sub Solve_Det{
 	my $det = Det($R);
 	my $dm = $det_main;
 
-	if($det){
-	    if($dm < 0){
+	if( $det ){
+	    if( $dm < 0 ){
 		$dm *= -1;
 		$det *= -1;
 	    }
@@ -335,6 +359,8 @@ sub _max_len_frac{
 
 sub _test_matrix{
     my $M = shift;
+
+    return 4 if scalar( grep{ grep !defined $_, @{$_} } @{$M} );
 
     my $rows = $#{$M}; # number of rows
     my $cols = $#{$M->[0]}; # number of columns
@@ -540,7 +566,7 @@ Alessandro Gorohovski, E<lt>angel@feht.dgtu.donetsk.uaE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2010 by A. N. Gorohovski
+Copyright (C) 2010-2011 by A. N. Gorohovski
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.8.8 or,

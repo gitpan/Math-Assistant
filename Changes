@@ -1,11 +1,13 @@
 Revision history for Perl extension Math::Assistant.
 
+0.04  April 15 2011
+	- Added exception handling for some subroutine
+
 0.03  January 10 2010
 	- Added option {eq => 'row|column'} for subroutine Solve_Det()
 	- Bug fixed in subroutine Rank() and Gaussian_elimination()
 	- README revised
 	- Added some examples into documentation
-
 
 0.02  Mon Jan  4 10:12:35 2010
 	- original version; created by h2xs 1.23 with options
