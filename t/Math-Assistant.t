@@ -8,6 +8,10 @@ use Math::Assistant qw(:algebra);
 my $M = [ [1,4,2,0,-3], [2,9,5,2,1], [1,3,1,-2,9], [3,12,6,0,-8], [2,10,6,4,7] ];
 is(Rank($M),3,'Rank of matrix 5x5');
 
+$M = [ [0, 2, 3, 4], [4, 0, 3, 2], [1, 4, 4, 3], [2, 3, 1, 1] ];
+is(Rank($M),4,'Rank of matrix 4x4');
+is(Det($M),88,'Determinant of matrix 4x4');
+
 $M = [
 	[1,1,1,1,1,1,1],
 	[64,32,16,8,4,2,1],

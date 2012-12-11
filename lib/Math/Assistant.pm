@@ -23,7 +23,7 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 our @EXPORT = qw( );
 
-our $VERSION = '0.04';
+our $VERSION = '0.0417';
 
 use base qw(Exporter);
 
@@ -34,19 +34,10 @@ use base qw(Exporter);
 # return:
 #	$rank (order)
 sub Rank{
-
-    my $t = &_test_matrix($_[0]);
-    if( $t > 3 ){
-	croak("Use of uninitialized value in matrix");
-
-    }elsif( $t > 1 ){
-	croak("Bad matrix");
-    }
-
     my $M = &Gaussian_elimination; # triangular matrix
     my $rank = 0;
 
-    for( @{ $M } ){ # rows
+    for( @$M ){ # rows
 	for( @{$_} ){ # element in row
 	    $rank++, last if $_
 	}
@@ -90,11 +81,11 @@ sub Gaussian_elimination{
     }
 
     # Check Float (Fraction)
-    for my $i (@{$M}){
+    for my $i ( @$M ){
 	my $max_frac = &_max_len_frac($i, 0);
 
 	if($max_frac){
-	    $_ *= 10**$max_frac for @{$i};
+	    $_ *= 10**$max_frac for @$i;
 	}
     }
 
@@ -139,11 +130,11 @@ sub Gaussian_elimination{
 	# Replacement of zero diagonal element
         my $s = 0;
 M_Gauss1:
-	while($M->[$n][$n] == 0 && $s < $rows-$n){
+	while( $M->[$n][$n] == 0 && $s < $rows - $n ){
 	    $s++;
-	    for( my $j = $n+1; $j <= $cols; $j++ ){
+	    for( my $j = $n + 1; $j <= $cols; $j++ ){
 
-		if($M->[$n][$j]){ # no zero element
+		if( $M->[$n][$j] ){ # no zero element
 		    # shift of columns $n <-> $j
 		    for( my $i = 0; $i <= $rows; $i++ ){
 			($M->[$i][$j], $M->[$i][$n]) = ($M->[$i][$n], $M->[$i][$j]);
@@ -158,7 +149,6 @@ M_Gauss1:
 		($M->[$n][$j], $M->[$n+$s][$j]) = ($M->[$n+$s][$j], $M->[$n][$j]);
 	    }
 	}
-
 
 	last unless $M->[$n][$n]; # zero elements of rows
 
@@ -183,7 +173,7 @@ M_Gauss1:
 
 	my $gcd = bgcd( @{$M->[$n]}[$n..$cols] );
 	if($gcd > 1){
-	    $_ /= $gcd for @{$M->[$n]}[$n..$cols];
+	    $_ = $_ / $gcd for @{$M->[$n]}[$n..$cols];
 	}
     }
     $M;
@@ -216,23 +206,11 @@ sub Det{
 
     # Check Float (Fraction)
     my $max_frac = 0;
-    for my $i (@{$M_ini}){
+    for my $i ( @$M_ini ){
 	$max_frac = &_max_len_frac($i, $max_frac);
     }
 
-    my $M;
-    if( $max_frac ){
-	for( my $i = 0; $i <= $rows; $i++ ){
-	    for( my $j = 0; $j <= $cols; $j++ ){
-		$M->[$i][$j] = $M_ini->[$i][$j];
-	    }
-	}
-	for my $i (@{$M}){
-	    $_ *= 10**$max_frac for @{$i};
-	}
-    }else{
-	$M = $M_ini;
-    }
+    my $M = $max_frac ? [ map{ [ map{ $_ * 10**$max_frac } @$_ ] } @$M_ini ] : $M_ini;
 
     my $iter = permutations([(0..$#{$M})]);
     while(my $prm = $iter->next){
@@ -240,7 +218,7 @@ sub Det{
 	my $p = 1;
 	my $i = 0;
 	my $j = 0;
-	for my $x (@{$prm}){
+	for my $x ( @$prm ){
 	    $p *= $M->[$i++][$x];
 
 	    # Inversions in permutations
@@ -248,15 +226,9 @@ sub Det{
 		$sign *= -1 if $x > $prm->[$k];
 	    }
 	}
-
 	$det += $sign * $p;
     }
-
-    if($max_frac){
-	return $det/10**($max_frac * ($rows + 1));
-    }else{
-	return $det;
-    }
+    return $max_frac ? $det/10**($max_frac * ($rows + 1)) : $det;
 }
 
 
@@ -277,7 +249,7 @@ sub Solve_Det{
     }
 
     croak("Vector doesn't correspond to a matrix") if $rows != $#{$B};
-    croak("Use of uninitialized value in vector") if scalar( grep !defined $_, @{$B} );
+    croak("Use of uninitialized value in vector") if scalar( grep ! defined $_, @$B );
 
     if(defined $opts){
 	if(exists $opts->{'eqs'}){
@@ -294,7 +266,7 @@ sub Solve_Det{
     my $solve;
 
     # main determinant
-    my $det_main = Det($M) || return undef; # no one solution
+    my $det_main = &Det( $M ) || return undef; # no one solution
 
     for( my $v = 0; $v <= $cols; $v++ ){
 
@@ -312,7 +284,7 @@ sub Solve_Det{
 
 	}
 
-	my $det = Det($R);
+	my $det = &Det( $R );
 	my $dm = $det_main;
 
 	if( $det ){
@@ -330,8 +302,8 @@ sub Solve_Det{
 
 	    my $gcd = bgcd(abs($det), abs($dm));
 	    if($gcd > 1){
-		$det /= $gcd;
-		$dm /= $gcd;
+		$det = $det / $gcd;
+		$dm = $dm / $gcd;
 	    }
 
 	    $solve->[$v] = $dm == 1 ? $det : "$det/$dm";
@@ -340,7 +312,6 @@ sub Solve_Det{
 	    $solve->[$v] = 0;
 	}
     }
-
     $solve;
 }
 
@@ -348,7 +319,7 @@ sub Solve_Det{
 sub _max_len_frac{
     my($M, $max_frac) = @_;
 
-    for(@{$M}){
+    for( @$M ){
 	next if Math::BigInt::is_int($_);
 	my(undef, $frac) = Math::BigFloat->new($_)->length();
 	$max_frac = $frac if $frac > $max_frac;
@@ -360,15 +331,15 @@ sub _max_len_frac{
 sub _test_matrix{
     my $M = shift;
 
-    return 4 if scalar( grep{ grep !defined $_, @{$_} } @{$M} );
+    return 4 if scalar( grep{ grep ! defined $_, @{$_} } @$M );
 
     my $rows = $#{$M}; # number of rows
     my $cols = $#{$M->[0]}; # number of columns
 
     my $quadra = 0;
-    $quadra = scalar( grep $#{$_} != $rows, @{$M} );
+    $quadra = scalar( grep $#{$_} != $rows, @$M );
     my $reqtan = 0;
-    $reqtan = scalar( grep $#{$_} != $cols, @{$M} );
+    $reqtan = scalar( grep $#{$_} != $cols, @$M );
 
     my $res = 0;
     $res++ if $quadra;
@@ -562,11 +533,11 @@ L<Math::MatrixReal> is a Perl module that offers similar features.
 
 =head1 AUTHOR
 
-Alessandro Gorohovski, E<lt>angel@feht.dgtu.donetsk.uaE<gt>
+Alessandro Gorohovski, E<lt>angel@domashka.kiev.uaE<gt>, E<lt>angel@feht.dgtu.donetsk.uaE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2010-2011 by A. N. Gorohovski
+Copyright (C) 2010-2012 by A. N. Gorohovski
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.8.8 or,

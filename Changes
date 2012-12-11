@@ -1,5 +1,9 @@
 Revision history for Perl extension Math::Assistant.
 
+0.0417 December 11 2012
+	- Fixed problem Math-BigInt for Perl 17.5.x
+	- Added some tests
+
 0.04  April 15 2011
 	- Added exception handling for some subroutine
 

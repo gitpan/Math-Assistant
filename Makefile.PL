@@ -5,11 +5,11 @@ WriteMakefile(
     NAME              => 'Math::Assistant',
     VERSION_FROM      => 'lib/Math/Assistant.pm',
     PREREQ_PM         => {
-            'Algorithm::Combinatorics'   => '0.26',
-            'Math::BigInt'	=> '1.993',
+            'Algorithm::Combinatorics'   => '0.27',
+            'Math::BigInt'	=> '1.997',
             'Math::BigFloat'	=> '1.993',
             'Carp'		=> '0',
-            'Test::More'	=> '0',
+            'Test::More'	=> '0.98',
     },
     dist => {
         COMPRESS => 'gzip -9f',
