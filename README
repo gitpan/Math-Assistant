@@ -1,4 +1,4 @@
-Math-Assistant version 0.0417
+Math-Assistant version 0.05
 =============================
 
 The module contains important algebraic operations: matrix (quadratic or non-quadratic)
@@ -24,7 +24,6 @@ DEPENDENCIES
 
 This module requires these other modules and libraries:
 
-Algorithm::Combinatorics
 Math::BigInt
 Math::BigFloat
 Test::More
@@ -33,7 +32,7 @@ Carp
 
 COPYRIGHT AND LICENCE
 
-Copyright (C) 2010-2012 by Alessandro Gorohovski
+Copyright (C) 2010-2013 by Alessandro Gorohovski
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.8.8 or,

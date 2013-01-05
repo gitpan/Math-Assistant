@@ -1,11 +1,10 @@
 package Math::Assistant;
 
-use 5.008008;
+use 5.008004;
 use strict;
 use warnings;
 
 use Carp;
-use Algorithm::Combinatorics qw( permutations );
 use Math::BigInt qw( bgcd );
 
 require Math::BigFloat;
@@ -14,7 +13,7 @@ require Exporter;
 our @ISA = qw(Exporter);
 
 our %EXPORT_TAGS = ( 'all' => [ qw(
-			Rank Det Solve_Det Gaussian_elimination
+			Rank Det Solve_Det Gaussian_elimination test_matrix
 			) ],
 		    'algebra' => [ qw( Rank Det Solve_Det ) ],
 );
@@ -23,7 +22,7 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 our @EXPORT = qw( );
 
-our $VERSION = '0.0417';
+our $VERSION = '0.05';
 
 use base qw(Exporter);
 
@@ -54,7 +53,7 @@ sub Rank{
 sub Gaussian_elimination{
     my $M_ini = shift;
 
-    my $t = &_test_matrix( $M_ini );
+    my $t = &test_matrix( $M_ini );
     if( $t > 3 ){
 	croak("Use of uninitialized value in matrix");
 
@@ -183,52 +182,75 @@ M_Gauss1:
 # Interger determinant for quadratic matrix
 # input:
 #	$Dimention
+#	facultative parameter
 # return:
 #	determinant
 #	undef
 sub Det{
-    my $M_ini = shift;
+    my( $M_ini, $opt ) = @_;
 
-    my $t = &_test_matrix($M_ini);
-    if( $t > 3 ){
-	croak("Use of uninitialized value in matrix");
+    my $dm = $#{ $M_ini }; # dimension of matrix
 
-    }elsif( $t ){
-	croak("Matrix is not quadratic");
-    }
-
-    my $det = 0;
-
-    my $rows = $#{$M_ini}; # number of rows
-    my $cols = $#{$M_ini->[0]}; # number of columns
-
-    return $M_ini->[0][0] if $#{$M_ini} < 1; # dim matrix = 1
+    return $M_ini->[0][0] if $dm < 1; # dim matrix = 1
 
     # Check Float (Fraction)
-    my $max_frac = 0;
-    for my $i ( @$M_ini ){
-	$max_frac = &_max_len_frac($i, $max_frac);
+    my $fraction = 0;
+    unless( exists $opt->{'int'} && $opt->{'int'} ){
+	for my $i ( @$M_ini ){
+	    $fraction = &_max_len_frac($i, $fraction);
+	}
     }
 
-    my $M = $max_frac ? [ map{ [ map{ $_ * 10**$max_frac } @$_ ] } @$M_ini ] : $M_ini;
+    my $M = $fraction ? [ map{ [ map{ $_ * 10**$fraction } @$_ ] } @$M_ini ] :
+			[ map{ [ @$_ ] } @$M_ini ]; # copy
 
-    my $iter = permutations([(0..$#{$M})]);
-    while(my $prm = $iter->next){
-	my $sign = 1; # +/-
-	my $p = 1;
-	my $i = 0;
-	my $j = 0;
-	for my $x ( @$prm ){
-	    $p *= $M->[$i++][$x];
+    my $exch = 0; # number of permutations
+    my $denom = 1;
 
-	    # Inversions in permutations
-	    for( my $k = ++$j; $k <= $#{$prm}; $k++ ){
-		$sign *= -1 if $x > $prm->[$k];
+    for( my $i = 0; $i < $dm; $i++ ){ # take all the matrix rows except 1st
+	my $minV = abs( $M->[$i][$i] );
+
+	if( ! $minV && $i < $dm - 1 ){
+	    my $minN = $i;
+
+	    # Search of row with abs minimal element on the diagonal
+	    for( my $j = $i + 1; $j <= $dm; $j++ ){
+		my $v = abs( $M->[$j][$i] );
+
+		if( $v && ($v < $minV || ! $minV) ){
+		    $minN = $j;
+		    $minV = $v;
+		}
+	    }
+
+	    return 0 unless $minV; # determinant = 0
+
+	    ( $M->[$i], $M->[$minN] ) = ( $M->[$minN], $M->[$i] );
+	    $exch++;
+	}
+
+	my $v1 = $M->[$i][$i];
+
+	for( my $j = $i + 1; $j <= $dm; $j++ ){
+	    my $v2 = $M->[$j][$i];
+
+	    for( my $k = $i + 1; $k <= $dm; $k++ ){
+		$M->[$j][$k] = ( $M->[$j][$k] * $v1 - $M->[$i][$k] * $v2 ) / $denom;
 	    }
 	}
-	$det += $sign * $p;
+	$denom = $v1;
     }
-    return $max_frac ? $det/10**($max_frac * ($rows + 1)) : $det;
+
+    for( $M->[$dm][$dm] ){
+	if( $_ < 0 ){
+	    $_ = abs;
+	    $exch++;
+	}
+	$_ = 1 + int if abs($_ - int ) >= 0.5;	# Rounding
+	$_ *= -1 if $exch%2;
+
+	return $fraction ? $_ / 10**($fraction * ($dm + 1)) : $_;
+    }
 }
 
 
@@ -237,10 +259,10 @@ sub Solve_Det{
     my $B = shift || croak("Missing vector");
     my $opts = shift;
 
-    my $rows = $#{$M}; # number of rows
-    my $cols = $#{$M->[0]}; # number of columns
+    my $rows = $#{ $M };	# number of rows
+    my $cols = $#{ $M->[0] };	# number of columns
 
-    my $t = &_test_matrix($M);
+    my $t = &test_matrix( $M );
     if( $t > 3 ){
 	croak("Use of uninitialized value in matrix");
 
@@ -251,11 +273,10 @@ sub Solve_Det{
     croak("Vector doesn't correspond to a matrix") if $rows != $#{$B};
     croak("Use of uninitialized value in vector") if scalar( grep ! defined $_, @$B );
 
-    if(defined $opts){
-	if(exists $opts->{'eqs'}){
+    if( defined $opts ){
+	if( exists $opts->{'eqs'} ){
 	    die "Unknown parameter \'$opts->{'eqs'}\'!\n"
 		unless $opts->{'eqs'}=~/^(?:row|column)/i;
-
 	}else{
 	    $opts->{'eqs'} = 'row';
 	}
@@ -266,7 +287,7 @@ sub Solve_Det{
     my $solve;
 
     # main determinant
-    my $det_main = &Det( $M ) || return undef; # no one solution
+    my $det_main = &Det( $M, $opts ) || return undef; # no one solution
 
     for( my $v = 0; $v <= $cols; $v++ ){
 
@@ -284,7 +305,7 @@ sub Solve_Det{
 
 	}
 
-	my $det = &Det( $R );
+	my $det = &Det( $R, $opts );
 	my $dm = $det_main;
 
 	if( $det ){
@@ -316,6 +337,18 @@ sub Solve_Det{
 }
 
 
+sub test_matrix{
+    my $M = shift;
+
+    return 4 if scalar( grep{ grep ! defined $_, @{$_} } @$M );
+
+    my $res = scalar( grep $#{$_} != $#{ $M }, @$M ) ? 1 : 0;	# quadra
+    $res += 2 if scalar( grep $#{$_} != $#{ $M->[0] }, @$M );	# reqtan;
+
+    $res;
+}
+
+
 sub _max_len_frac{
     my($M, $max_frac) = @_;
 
@@ -325,27 +358,6 @@ sub _max_len_frac{
 	$max_frac = $frac if $frac > $max_frac;
     }
     $max_frac;
-}
-
-
-sub _test_matrix{
-    my $M = shift;
-
-    return 4 if scalar( grep{ grep ! defined $_, @{$_} } @$M );
-
-    my $rows = $#{$M}; # number of rows
-    my $cols = $#{$M->[0]}; # number of columns
-
-    my $quadra = 0;
-    $quadra = scalar( grep $#{$_} != $rows, @$M );
-    my $reqtan = 0;
-    $reqtan = scalar( grep $#{$_} != $cols, @$M );
-
-    my $res = 0;
-    $res++ if $quadra;
-    $res += 2 if $reqtan;
-
-    $res;
 }
 
 1;
@@ -362,26 +374,25 @@ Math::Assistant - functions for various exact algebraic calculations
   my $M = [ [4,1,4,3], [3,-4,7,5], [4,-9,8,5], [-3,2,-5,3], [2,2,-1,0] ];
 
   # Rank of rectangular matrix
-  my $rank = Rank($M);
+  my $rank = Rank( $M );
   print "Rank = $rank\n";
 
-  shift @{$M}; # Now a quadratic matrix
+  shift @$M; # Now a quadratic matrix
 
-  # Determinant of quadratic matrix
-  my $determinant = Det($M);
+  # Determinant of quadratic (integer) matrix
+  my $determinant = Det( $M, {'int' => 1} );
   print "Determinant = $determinant\n";
 
   # Solve an equation system
-  my $B = [ 1,2,3,4 ];
-  my $solve = Solve_Det($M, $B); # eqs => 'row' (default)
-  print "Equations is rows of matrix:\n";
-  print "$_\n" for @{$solve};
+  my $B = [ 1, 2, 3, 4 ];
+  my $solve = Solve_Det($M, $B, {'int' => 1} ); # 'eqs' => 'row' (default)
+  print "Equations is rows of matrix:\n", map{ "$_\n" } @$solve;
 
   use Math::BigRat;
-  print(Math::BigRat->new("$_")->numify(),"\n") for @{$solve};
+  print(Math::BigRat->new("$_")->numify(),"\n") for @$solve;
 
   print "Equations is columns of matrix:\n";
-  print "$_\n" for @{ Solve_Det( $M, $B, {'eqs' => 'column' } ) ;
+  print "$_\n" for @{ Solve_Det( $M, $B, {'eqs' => 'column', 'int' => 1} ) ;
 
 
 will print
@@ -417,15 +428,16 @@ Calculations with the raised accuracy.
 
 Math::Assistant provides these subroutines:
 
-    Rank(\@matrix)
-    Det(\@matrix)
-    Solve_Det(\@A_matrix, \@b_vector, {eqs => 'row|column' } )
-    Gaussian_elimination(\@matrix)
+    Rank( \@matrix )
+    Det( \@matrix [, { int => 1 }] )
+    Solve_Det( \@A_matrix, \@b_vector [, { eqs => 'row|column', int => 1 }] )
+    Gaussian_elimination( \@matrix )
+    test_matrix( \@matrix )
 
 All of them are context-sensitive.
 
 
-=head2 Rank(\@matrix)
+=head2 Rank( \@matrix )
 
 Calculates rank of rectangular (quadratic or non-quadratic) C<@matrix>.
 Rank is a measure of the number of linear independent row and column
@@ -433,13 +445,32 @@ Rank is a measure of the number of linear independent row and column
 an equation system).
 
 
-=head2 Det(\@matrix)
+=head2 Det( \@matrix [, { int => 1 }] )
 
 This subroutine returns the determinant of the C<@matrix>.
-Only quadratic matrices have determinant. For non-quadratic matrix returns C<undef>.
+Only quadratic matrices have determinant.
+Subroutine test_matrix uses for testing of non-quadratic C<@matrix>.
+
+If all elements of C<@matrix> are integers then are using the facultative 
+parameter C<'int'>. This causes subroutine to be a bit faster.
 
 
-=head2 Solve_Det(\@A_matrix, \@b_vector, {eqs => 'row|column' } )
+=head2 test_matrix( \@matrix )
+
+Use this subroutine for testing of C<@matrix>.
+This subroutine returns: 0 (Ok), 1..4 (Error).
+E.g.:
+
+    my $t = Math::Assistant::test_matrix( $M );
+    if( $t > 3 ){
+	print "Use of uninitialized value in matrix\n";
+
+    }elsif( $t ){
+	croak("Matrix is not quadratic");
+    }
+
+
+=head2 Solve_Det(\@A_matrix, \@b_vector [, {eqs => 'row|column', int => 1}] )
 
 Use this subroutine to actually solve an equation system.
 
@@ -472,7 +503,7 @@ is no solution.
 
     my $B = [ 4, 85, 820, 4369, 16276, 47989, 120100 ];
 
-    print "$_\t" for @{ Solve_Det($M, $B) };
+    print "$_\t" for @{ Solve_Det( $M, $B, {int => 1} ) };
 
 will print:
 
@@ -497,7 +528,7 @@ will print:
     -38049/17377  22902/17377  35101/34754  -36938/86885
 
 
-=head2 Gaussian_elimination(\@matrix)
+=head2 Gaussian_elimination( \@matrix )
 
 This subroutine returns matrix Gaussian elimination of the C<@matrix>.
 The initial C<@matrix> does not vary.
@@ -521,9 +552,8 @@ and the tag C<all> exports them all:
 
 =head1 DEPENDENCIES
 
-Math::Assistant is known to run under perl 5.8.8 on Linux.
-The distribution uses L<Algorithm::Combinatorics> for the subroutine C<Det()>,
-L<Math::BigInt>, L<Math::BigFloat> and L<Carp>.
+Math::Assistant is known to run under perl 5.12.4 on Linux.
+The distribution uses L<Math::BigInt>, L<Math::BigFloat>, L<Test::More> and L<Carp>.
 
 
 =head1 SEE ALSO
@@ -533,11 +563,11 @@ L<Math::MatrixReal> is a Perl module that offers similar features.
 
 =head1 AUTHOR
 
-Alessandro Gorohovski, E<lt>angel@domashka.kiev.uaE<gt>, E<lt>angel@feht.dgtu.donetsk.uaE<gt>
+Alessandro Gorohovski, E<lt>an.gorohovski@gmail.comE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2010-2012 by A. N. Gorohovski
+Copyright (C) 2010-2013 by A. N. Gorohovski
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.8.8 or,
